@@ -1,82 +1,56 @@
 #!/usr/bin/python3
-"""
-    Module containing BaseModel
-"""
-from uuid import uuid4
+"""This script is the base model"""
+
+import uuid
 from datetime import datetime
-import models
-from sqlalchemy import create_engine, Column, Integer, String, DateTime
-from sqlalchemy.ext.declarative import declarative_base
-from os import environ
-
-storage_engine = environ.get("HBNB_TYPE_STORAGE")
-
-if (storage_engine == "db"):
-    Base = declarative_base()
-else:
-    Base = object
+from models import storage
 
 
-class BaseModel():
-    """
-        Base class to define all common attributes and methods for
-        other classes
-    """
-    id = Column(String(60), primary_key=True, nullable=False)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow())
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow())
+class BaseModel:
+
+    """Class from which all other classes will inherit"""
 
     def __init__(self, *args, **kwargs):
+        """Initializes instance attributes
+
+        Args:
+            - *args: list of arguments
+            - **kwargs: dict of key-values arguments
         """
-            initialization of BaseModel
-        """
-        if kwargs:
+
+        if kwargs is not None and kwargs != {}:
             for key in kwargs:
-                if key == "__class__":
-                    continue
-                elif key in ("created_at", "updated_at"):
-                    iso = "%Y-%m-%dT%H:%M:%S.%f"
-                    setattr(self, key, datetime.strptime(kwargs[key], iso))
+                if key == "created_at":
+                    self.__dict__["created_at"] = datetime.strptime(
+                        kwargs["created_at"], "%Y-%m-%dT%H:%M:%S.%f")
+                elif key == "updated_at":
+                    self.__dict__["updated_at"] = datetime.strptime(
+                        kwargs["updated_at"], "%Y-%m-%dT%H:%M:%S.%f")
                 else:
-                    setattr(self, key, kwargs[key])
-                self.id = str(uuid4())
+                    self.__dict__[key] = kwargs[key]
         else:
-            self.id = str(uuid4())
-            self.created_at = self.updated_at = datetime.now()
+            self.id = str(uuid.uuid4())
+            self.created_at = datetime.now()
+            self.updated_at = datetime.now()
+            storage.new(self)
 
     def __str__(self):
-        """
-            return string representation of a Model
-        """
-        return "[{}] ({}) {}".format(self.__class__.__name__,
-                                     self.id, self.__dict__)
+        """Returns official string representation"""
+
+        return "[{}] ({}) {}".\
+            format(type(self).__name__, self.id, self.__dict__)
 
     def save(self):
-        """
-            update latest updation time of a model
-        """
+        """updates the public instance attribute updated_at"""
+
         self.updated_at = datetime.now()
-        models.storage.new(self)
-        models.storage.save()
+        storage.save()
 
     def to_dict(self):
-        """
-            custom representation of a model
-        """
-        custom = self.__dict__.copy()
-        custom_dict = {}
-        custom_dict.update({"__class__": self.__class__.__name__})
-        for key in list(custom):
-            if key in ("created_at", "updated_at"):
-                custom_dict.update({key: getattr(self, key).isoformat()})
-            elif key == "_sa_instance_state":
-                custom.pop(key)
-            else:
-                custom_dict.update({key: getattr(self, key)})
-        return custom_dict
+        """returns a dictionary containing all keys/values of __dict__"""
 
-    def delete(self):
-        """ delete the current instance from the storage
-        """
-        k = "{}.{}".format(type(self).__name__, self.id)
-        del models.storage.__objects[k]
+        my_dict = self.__dict__.copy()
+        my_dict["__class__"] = type(self).__name__
+        my_dict["created_at"] = my_dict["created_at"].isoformat()
+        my_dict["updated_at"] = my_dict["updated_at"].isoformat()
+        return my_dict
